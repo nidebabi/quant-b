@@ -1,4 +1,5 @@
 export type SourceState = "ok" | "fallback" | "error";
+export type FeedDataSource = "real" | "fallback" | "cached";
 
 export interface SourceStatus {
   source: string;
@@ -17,7 +18,9 @@ export interface OverviewCard {
 
 export interface IntelFeedItem {
   id: string;
-  time: string;
+  publishedAt?: string;
+  fetchedAt: string;
+  displayTime: string;
   source: string;
   region: string;
   tag: string;
@@ -62,5 +65,6 @@ export interface MarketIntelligenceOverview {
   mappings: IntelMapping[];
   alerts: IntelAlert[];
   sourceStatus: SourceStatus[];
+  feedDataSource: FeedDataSource;
   lastUpdated: string;
 }
