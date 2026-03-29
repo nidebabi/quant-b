@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   BarChart3,
@@ -21,7 +22,7 @@ import {
 } from "lucide-react";
 
 export default function QuantUIPrototype() {
-  const nav = [
+  const nav: Array<{ key: string; icon: LucideIcon }> = [
     { key: "仪表盘", icon: LayoutDashboard },
     { key: "市场情报", icon: Newspaper },
     { key: "因子选股", icon: Filter },
@@ -42,7 +43,15 @@ export default function QuantUIPrototype() {
   const muted = "text-sm text-slate-400";
   const sectionTitle = "text-lg font-semibold text-white";
 
-  const dashboardStatCards = [
+  const dashboardStatCards: Array<{
+    title: string;
+    value: string;
+    change: string;
+    desc: string;
+    tone: string;
+    chip: string;
+    icon: LucideIcon;
+  }> = [
     {
       title: "上证指数",
       value: "3,126.84",
@@ -1171,22 +1180,24 @@ export default function QuantUIPrototype() {
             <SectionHeader title="核心指标" desc="收益、胜率、回撤分色展示。" />
             <div className="space-y-3">
               {[
-                ["总收益率", "+26.8%", "text-emerald-300", TrendingUp],
-                ["胜率", "61.2%", "text-cyan-300", Activity],
-                ["最大回撤", "-7.9%", "text-rose-300", TrendingDown],
-                ["总交易数", "83", "text-amber-300", Layers3],
-                ["平均单笔收益", "+1.9%", "text-fuchsia-300", Target],
-              ].map(([k, v, tone, Icon]) => (
-                <div key={k} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/20 px-4 py-3">
+                { key: "总收益率", value: "+26.8%", tone: "text-emerald-300", icon: TrendingUp },
+                { key: "胜率", value: "61.2%", tone: "text-cyan-300", icon: Activity },
+                { key: "最大回撤", value: "-7.9%", tone: "text-rose-300", icon: TrendingDown },
+                { key: "总交易数", value: "83", tone: "text-amber-300", icon: Layers3 },
+                { key: "平均单笔收益", value: "+1.9%", tone: "text-fuchsia-300", icon: Target },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                <div key={item.key} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/20 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="rounded-xl bg-white/8 p-2">
-                      <Icon className={`h-4 w-4 ${tone}`} />
+                      <Icon className={`h-4 w-4 ${item.tone}`} />
                     </div>
-                    <span className="text-sm text-slate-300">{k}</span>
+                    <span className="text-sm text-slate-300">{item.key}</span>
                   </div>
-                  <span className={`font-semibold ${tone}`}>{v}</span>
+                  <span className={`font-semibold ${item.tone}`}>{item.value}</span>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
 
