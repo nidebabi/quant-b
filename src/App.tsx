@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
   Activity,
   BarChart3,
@@ -342,7 +343,7 @@ export default function QuantUIPrototype() {
     return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${toneMap[label] || toneMap.A}`}>{label}</span>;
   };
 
-  const SectionHeader = ({ title, desc, action }) => (
+  const SectionHeader = ({ title, desc, action = null }: { title: string; desc: string; action?: ReactNode }) => (
     <div className="flex items-center justify-between gap-4 mb-5">
       <div>
         <div className={sectionTitle}>{title}</div>
