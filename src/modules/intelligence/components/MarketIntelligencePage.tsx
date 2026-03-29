@@ -16,6 +16,8 @@ export const MarketIntelligencePage = ({
   renderHeader: (props: HeaderProps) => ReactNode;
 }) => {
   const { data, loading, error, refresh } = useMarketIntelligence();
+  const isFallbackFeed = data?.feedDataSource === "fallback";
+  const feedSourceLabel = data?.feedDataSource || "--";
 
   return (
     <div className="space-y-7">
@@ -50,6 +52,7 @@ export const MarketIntelligencePage = ({
           </div>
 
           {error && <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">{error}</div>}
+          {isFallbackFeed && <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">当前为 fallback 数据</div>}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
@@ -60,7 +63,7 @@ export const MarketIntelligencePage = ({
                   <div className="text-lg font-semibold text-white">实时快讯流</div>
                   <div className="mt-1 text-sm text-slate-400">按时间倒序展示，优先展示高影响等级消息。</div>
                 </div>
-                <div className="rounded-full border border-cyan-300/15 bg-cyan-400/8 px-3 py-1 text-xs font-semibold text-cyan-300">Live Feed</div>
+                <div className="rounded-full border border-cyan-300/15 bg-cyan-400/8 px-3 py-1 text-xs font-semibold text-cyan-300">Live Feed · {feedSourceLabel}</div>
               </div>
               <div className="mt-2 text-[11px] leading-5 text-slate-500">字段：时间 / 来源 / 地区 / 标签 / 影响等级 / 标题 / 影响映射</div>
               <div className="mt-2 text-[11px] leading-5 text-slate-500">接口建议：AKShare（国内资讯代理）/ GDELT（国际新闻）/ Finnhub（海外金融快讯）</div>
@@ -70,7 +73,7 @@ export const MarketIntelligencePage = ({
                 {(data?.feed || []).map((item) => (
                   <div key={item.id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-xs text-slate-200">{item.time}</span>
+                      <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-xs text-slate-200">{item.displayTime}</span>
                       <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-xs text-slate-300">{item.source}</span>
                       <span className="rounded-full border border-fuchsia-300/15 bg-fuchsia-400/8 px-2.5 py-1 text-xs text-fuchsia-200">{item.region}</span>
                       <span className="rounded-full border border-cyan-300/15 bg-cyan-400/8 px-2.5 py-1 text-xs text-cyan-200">{item.tag}</span>

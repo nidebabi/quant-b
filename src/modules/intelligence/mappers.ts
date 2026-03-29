@@ -1,6 +1,30 @@
 import { ALERT_RULES, FALLBACK_ALERTS } from "./constants";
 import type { IntelAlert, IntelCluster, IntelFeedItem, IntelMapping, OverviewCard, SourceStatus } from "./types";
 
+const formatDisplayTime = (value?: string): string => {
+  if (!value) return "发布时间：未知";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "发布时间：未知";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  return `发布时间：${yyyy}年${mm}月${dd}日 ${hh}点${mi}分`;
+};
+
+export const withDisplayTime = (item: IntelFeedItem): IntelFeedItem => {
+  const fallbackFetchedAt = item.fetchedAt || new Date().toISOString();
+  const preferredTime = item.publishedAt || fallbackFetchedAt;
+  return {
+    ...item,
+    fetchedAt: fallbackFetchedAt,
+    displayTime: formatDisplayTime(preferredTime),
+  };
+};
+
+export const normalizeFeedDisplayTime = (feed: IntelFeedItem[]): IntelFeedItem[] => feed.map(withDisplayTime);
+
 const inferLevel = (title: string): IntelFeedItem["level"] => {
   if (/(突发|急升|升级|冲突|降息|政策|制裁|暴涨)/.test(title)) return "高";
   if (/(预期|震荡|调整|关注)/.test(title)) return "中";
@@ -31,9 +55,15 @@ const inferImpact = (title: string): string => {
 };
 
 export const mapReutersNews = (items: Array<{ title: string; pubDate?: string; source?: string }>): IntelFeedItem[] =>
-  items.slice(0, 8).map((item, index) => ({
-    id: `reuters-${index}`,
-    time: item.pubDate ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" }) : "--:--",
+  items
+    .slice()
+    .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime())
+    .slice(0, 8)
+    .map((item, index) => ({
+    id: `reuters-${item.pubDate || "no-pub"}-${index}`,
+    publishedAt: item.pubDate,
+    fetchedAt: new Date().toISOString(),
+    displayTime: formatDisplayTime(item.pubDate || new Date().toISOString()),
     source: item.source || "Reuters",
     region: inferRegion(item.title),
     tag: inferTag(item.title),
