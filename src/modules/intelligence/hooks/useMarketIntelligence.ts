@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getMarketIntelligenceOverview } from "../services/intelligenceService";
+import { getMarketIntelligenceOverview, IntelligenceRefreshError } from "../services/intelligenceService";
 import type { MarketIntelligenceOverview } from "../types";
 
 export const useMarketIntelligence = () => {
@@ -15,7 +15,12 @@ export const useMarketIntelligence = () => {
       setData(next);
     } catch (e) {
       console.error("[intelligence] refresh failed", e);
-      setError("刷新失败，已展示可用数据，请稍后重试。");
+      if (e instanceof IntelligenceRefreshError) {
+        setData(e.fallbackData);
+        setError(e.message);
+      } else {
+        setError("刷新失败，请检查网络后重试。");
+      }
     } finally {
       setLoading(false);
     }

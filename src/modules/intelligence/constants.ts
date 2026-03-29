@@ -1,10 +1,10 @@
 import type { IntelAlert, IntelAsset, IntelCluster, IntelFeedItem } from "./types";
 
 export const FALLBACK_FEED: IntelFeedItem[] = [
-  { id: "f1", time: "07:42", source: "财联社", region: "国内政策", tag: "电力", level: "高", title: "能源相关政策预期升温，市场关注电力链条后续催化。", impact: "利好电力 / 绿电方向" },
-  { id: "f2", time: "08:15", source: "GDELT", region: "国际形势", tag: "原油", level: "高", title: "中东局势再起波动，国际油价盘中拉升，避险情绪升温。", impact: "关注油气 / 黄金 / 航运" },
-  { id: "f3", time: "09:06", source: "Finnhub", region: "海外宏观", tag: "美联储", level: "中", title: "美债收益率短线波动，市场重新评估年内降息路径。", impact: "影响风险偏好与成长风格" },
-  { id: "f4", time: "10:23", source: "AKShare", region: "大宗商品", tag: "铜 / 煤", level: "中", title: "工业品价格继续分化，铜价偏强、煤炭价格趋稳。", impact: "关注资源 / 电力设备链条" },
+  { id: "f1", fetchedAt: "2026-03-29T07:42:00.000Z", displayTime: "15:42", source: "财联社", region: "国内政策", tag: "电力", level: "高", title: "能源相关政策预期升温，市场关注电力链条后续催化。", impact: "利好电力 / 绿电方向" },
+  { id: "f2", fetchedAt: "2026-03-29T08:15:00.000Z", displayTime: "16:15", source: "GDELT", region: "国际形势", tag: "原油", level: "高", title: "中东局势再起波动，国际油价盘中拉升，避险情绪升温。", impact: "关注油气 / 黄金 / 航运" },
+  { id: "f3", fetchedAt: "2026-03-29T09:06:00.000Z", displayTime: "17:06", source: "Finnhub", region: "海外宏观", tag: "美联储", level: "中", title: "美债收益率短线波动，市场重新评估年内降息路径。", impact: "影响风险偏好与成长风格" },
+  { id: "f4", fetchedAt: "2026-03-29T10:23:00.000Z", displayTime: "18:23", source: "AKShare", region: "大宗商品", tag: "铜 / 煤", level: "中", title: "工业品价格继续分化，铜价偏强、煤炭价格趋稳。", impact: "关注资源 / 电力设备链条" },
 ];
 
 export const FALLBACK_CLUSTERS: IntelCluster[] = [

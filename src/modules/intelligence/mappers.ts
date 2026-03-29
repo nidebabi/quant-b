@@ -31,9 +31,15 @@ const inferImpact = (title: string): string => {
 };
 
 export const mapReutersNews = (items: Array<{ title: string; pubDate?: string; source?: string }>): IntelFeedItem[] =>
-  items.slice(0, 8).map((item, index) => ({
-    id: `reuters-${index}`,
-    time: item.pubDate ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" }) : "--:--",
+  items
+    .slice()
+    .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime())
+    .slice(0, 8)
+    .map((item, index) => ({
+    id: `reuters-${item.pubDate || "no-pub"}-${index}`,
+    publishedAt: item.pubDate,
+    fetchedAt: new Date().toISOString(),
+    displayTime: item.pubDate ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" }),
     source: item.source || "Reuters",
     region: inferRegion(item.title),
     tag: inferTag(item.title),

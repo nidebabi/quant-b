@@ -2,7 +2,9 @@ type SourceStatus = { source: string; status: "ok" | "fallback" | "error"; messa
 
 type FeedItem = {
   id: string;
-  time: string;
+  publishedAt?: string;
+  fetchedAt: string;
+  displayTime: string;
   source: string;
   region: string;
   tag: string;
@@ -14,17 +16,27 @@ type FeedItem = {
 type AssetItem = { asset: string; price: string; change: string; note: string };
 
 const safeFetch = async (url: string) => {
-  const response = await fetch(url);
+  const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  const json = await response.json();
+  const age = response.headers.get("age");
+  const xCache = response.headers.get("x-cache");
+  const cached = Boolean((age && Number(age) > 0) || (xCache && /hit/i.test(xCache)));
+  return { json, cached };
 };
 
 const mapNews = (items: Array<{ title: string; pubDate?: string }>): FeedItem[] =>
-  items.slice(0, 8).map((item, index) => ({
-    id: `news-${index}`,
-    time: item.pubDate
+  items
+    .slice()
+    .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime())
+    .slice(0, 8)
+    .map((item, index) => ({
+    id: `news-${item.pubDate || "no-pub"}-${index}`,
+    publishedAt: item.pubDate,
+    fetchedAt: new Date().toISOString(),
+    displayTime: item.pubDate
       ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Shanghai" })
-      : "--:--",
+      : new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Shanghai" }),
     source: "Reuters",
     region: /Fed|U\.S|Treasury|inflation/i.test(item.title) ? "海外宏观" : "国际形势",
     tag: /oil|crude|OPEC/i.test(item.title) ? "原油" : /gold/i.test(item.title) ? "黄金" : "宏观",
@@ -52,12 +64,16 @@ export default async function handler(_req: any, res: any) {
   const sourceStatus: SourceStatus[] = [];
   const feed: FeedItem[] = [];
   const assets: AssetItem[] = [];
+  let feedDataSource: "real" | "fallback" | "cached" = "fallback";
 
   try {
-    const newsJson = await safeFetch("https://api.rss2json.com/v1/api.json?rss_url=https://feeds.reuters.com/reuters/worldNews");
-    if (Array.isArray(newsJson.items)) {
-      feed.push(...mapNews(newsJson.items));
-      sourceStatus.push({ source: "Reuters News", status: "ok", message: "rss2json 代理可用" });
+    const newsResp = await safeFetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent("https://feeds.reuters.com/reuters/worldNews")}&t=${Date.now()}`);
+    if (Array.isArray(newsResp.json.items) && newsResp.json.items.length > 0) {
+      feed.push(...mapNews(newsResp.json.items));
+      feedDataSource = newsResp.cached ? "cached" : "real";
+      sourceStatus.push({ source: "Reuters News", status: "ok", message: newsResp.cached ? "rss2json 返回缓存结果" : "rss2json 代理可用" });
+    } else {
+      sourceStatus.push({ source: "Reuters News", status: "fallback", message: "rss2json 未返回可用快讯" });
     }
   } catch (error) {
     sourceStatus.push({ source: "Reuters News", status: "fallback", message: `不可用: ${String(error)}` });
@@ -67,11 +83,9 @@ export default async function handler(_req: any, res: any) {
   if (tdKey) {
     try {
       const symbols = ["XAU/USD", "USDX", "XTI/USD", "US10Y"];
-      const requests = symbols.map((symbol) =>
-        safeFetch(`https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${tdKey}`),
-      );
+      const requests = symbols.map((symbol) => safeFetch(`https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${tdKey}&t=${Date.now()}`));
       const rows = await Promise.all(requests);
-      rows.forEach((row, idx) => assets.push(mapAsset(symbols[idx].replace("/", ""), row)));
+      rows.forEach((row, idx) => assets.push(mapAsset(symbols[idx].replace("/", ""), row.json)));
       sourceStatus.push({ source: "TwelveData", status: "ok", message: "关键资产实时接口可用" });
     } catch (error) {
       sourceStatus.push({ source: "TwelveData", status: "fallback", message: `接口异常: ${String(error)}` });
@@ -80,6 +94,6 @@ export default async function handler(_req: any, res: any) {
     sourceStatus.push({ source: "TwelveData", status: "fallback", message: "未配置 TWELVEDATA_API_KEY" });
   }
 
-  res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=120");
-  res.status(200).json({ feed, assets, sourceStatus });
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.status(200).json({ feed, assets, sourceStatus, feedDataSource });
 }
