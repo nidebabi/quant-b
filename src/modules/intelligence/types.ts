@@ -17,7 +17,9 @@ export interface OverviewCard {
 
 export interface IntelFeedItem {
   id: string;
-  time: string;
+  displayTime: string;
+  publishedAt?: string;
+  fetchedAt: string;
   source: string;
   region: string;
   tag: string;
@@ -54,6 +56,9 @@ export interface IntelAlert {
   active: boolean;
 }
 
+export type FeedSource = "real" | "fallback";
+export type CacheStatus = "hit" | "miss" | "bypass" | "unknown";
+
 export interface MarketIntelligenceOverview {
   overviewCards: OverviewCard[];
   feed: IntelFeedItem[];
@@ -63,4 +68,7 @@ export interface MarketIntelligenceOverview {
   alerts: IntelAlert[];
   sourceStatus: SourceStatus[];
   lastUpdated: string;
+  feedSource: FeedSource;
+  isFallback: boolean;
+  cacheStatus: CacheStatus;
 }

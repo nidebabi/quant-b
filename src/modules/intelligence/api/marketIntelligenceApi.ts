@@ -1,46 +1,57 @@
 import { FALLBACK_ASSETS, FALLBACK_CLUSTERS, FALLBACK_FEED } from "../constants";
-import type { IntelAsset, IntelFeedItem, SourceStatus } from "../types";
+import { mapReutersNews } from "../mappers";
+import type { CacheStatus, IntelAsset, IntelFeedItem, SourceStatus } from "../types";
 
 interface OverviewApiResponse {
   feed?: IntelFeedItem[];
   assets?: IntelAsset[];
   sourceStatus?: SourceStatus[];
+  cacheStatus?: CacheStatus;
 }
 
-const safeFetchJson = async <T>(url: string): Promise<T> => {
-  const res = await fetch(url);
+const buildNoCacheUrl = (url: string): string => {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}ts=${Date.now()}`;
+};
+
+const safeFetchJson = async <T>(url: string): Promise<{ data: T; cacheStatus: CacheStatus }> => {
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
+
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
   }
-  return (await res.json()) as T;
+
+  return {
+    data: (await res.json()) as T,
+    cacheStatus: (res.headers.get("x-cache-status") as CacheStatus) || "bypass",
+  };
 };
 
 export const fetchOverviewFromServerless = async (): Promise<OverviewApiResponse> => {
-  return safeFetchJson<OverviewApiResponse>("/api/intelligence/overview");
+  const { data, cacheStatus } = await safeFetchJson<OverviewApiResponse>(buildNoCacheUrl("/api/intelligence/overview"));
+  return {
+    ...data,
+    cacheStatus: data.cacheStatus || cacheStatus,
+  };
 };
 
 export const fetchPublicNewsFallback = async (): Promise<IntelFeedItem[]> => {
-  const url = "https://api.rss2json.com/v1/api.json?rss_url=https://feeds.reuters.com/reuters/worldNews";
-  try {
-    const json = await safeFetchJson<{ items?: Array<{ title: string; pubDate?: string }> }>(url);
-    const items = json.items || [];
-    if (!items.length) return FALLBACK_FEED;
-    return items.slice(0, 8).map((item, index) => ({
-      id: `rss-${index}`,
-      time: item.pubDate
-        ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
-        : "--:--",
-      source: "Reuters",
-      region: "国际形势",
-      tag: "宏观",
-      level: index < 2 ? "高" : "中",
-      title: item.title,
-      impact: "关注市场风险偏好变化",
-    }));
-  } catch {
-    return FALLBACK_FEED;
+  const url = buildNoCacheUrl("https://api.rss2json.com/v1/api.json?rss_url=https://feeds.reuters.com/reuters/worldNews");
+  const { data } = await safeFetchJson<{ items?: Array<{ title: string; pubDate?: string }> }>(url);
+  const items = data.items || [];
+  if (!items.length) {
+    throw new Error("fallback news source returned no items");
   }
+
+  return mapReutersNews(items);
 };
 
 export const getFallbackAssets = (): IntelAsset[] => FALLBACK_ASSETS;
 export const getFallbackClusters = () => FALLBACK_CLUSTERS;
+export const getStaticFallbackFeed = (): IntelFeedItem[] => FALLBACK_FEED;

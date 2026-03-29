@@ -2,7 +2,9 @@ type SourceStatus = { source: string; status: "ok" | "fallback" | "error"; messa
 
 type FeedItem = {
   id: string;
-  time: string;
+  displayTime: string;
+  publishedAt?: string;
+  fetchedAt: string;
   source: string;
   region: string;
   tag: string;
@@ -14,24 +16,53 @@ type FeedItem = {
 type AssetItem = { asset: string; price: string; change: string; note: string };
 
 const safeFetch = async (url: string) => {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
+
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 };
 
-const mapNews = (items: Array<{ title: string; pubDate?: string }>): FeedItem[] =>
-  items.slice(0, 8).map((item, index) => ({
-    id: `news-${index}`,
-    time: item.pubDate
-      ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Shanghai" })
-      : "--:--",
-    source: "Reuters",
-    region: /Fed|U\.S|Treasury|inflation/i.test(item.title) ? "海外宏观" : "国际形势",
-    tag: /oil|crude|OPEC/i.test(item.title) ? "原油" : /gold/i.test(item.title) ? "黄金" : "宏观",
-    level: /surge|jump|war|sanction|rate/i.test(item.title) ? "高" : "中",
-    title: item.title,
-    impact: /oil|crude/i.test(item.title) ? "关注油气 / 航运，留意成本端压力" : "关注市场风险偏好变化",
-  }));
+const toDisplayTime = (publishedAt?: string, fetchedAt?: string) => {
+  const preferred = publishedAt || fetchedAt;
+  if (!preferred) return "--:--";
+  return new Date(preferred).toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Shanghai",
+  });
+};
+
+const mapNews = (items: Array<{ title: string; pubDate?: string }>): FeedItem[] => {
+  const fetchedAt = new Date().toISOString();
+
+  return items
+    .slice()
+    .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime())
+    .slice(0, 8)
+    .map((item, index) => {
+      const publishedAt = item.pubDate ? new Date(item.pubDate).toISOString() : undefined;
+
+      return {
+        id: `news-${index}-${publishedAt || fetchedAt}`,
+        displayTime: toDisplayTime(publishedAt, fetchedAt),
+        publishedAt,
+        fetchedAt,
+        source: "Reuters",
+        region: /Fed|U\.S|Treasury|inflation/i.test(item.title) ? "海外宏观" : "国际形势",
+        tag: /oil|crude|OPEC/i.test(item.title) ? "原油" : /gold/i.test(item.title) ? "黄金" : "宏观",
+        level: /surge|jump|war|sanction|rate/i.test(item.title) ? "高" : "中",
+        title: item.title,
+        impact: /oil|crude/i.test(item.title) ? "关注油气 / 航运，留意成本端压力" : "关注市场风险偏好变化",
+      };
+    });
+};
 
 const mapAsset = (symbol: string, value: any): AssetItem => {
   const price = Number(value.close ?? value.price ?? 0);
@@ -54,10 +85,12 @@ export default async function handler(_req: any, res: any) {
   const assets: AssetItem[] = [];
 
   try {
-    const newsJson = await safeFetch("https://api.rss2json.com/v1/api.json?rss_url=https://feeds.reuters.com/reuters/worldNews");
+    const newsJson = await safeFetch("https://api.rss2json.com/v1/api.json?rss_url=https://feeds.reuters.com/reuters/worldNews&ts=" + Date.now());
     if (Array.isArray(newsJson.items)) {
       feed.push(...mapNews(newsJson.items));
       sourceStatus.push({ source: "Reuters News", status: "ok", message: "rss2json 代理可用" });
+    } else {
+      sourceStatus.push({ source: "Reuters News", status: "fallback", message: "rss2json 返回空数据" });
     }
   } catch (error) {
     sourceStatus.push({ source: "Reuters News", status: "fallback", message: `不可用: ${String(error)}` });
@@ -67,9 +100,7 @@ export default async function handler(_req: any, res: any) {
   if (tdKey) {
     try {
       const symbols = ["XAU/USD", "USDX", "XTI/USD", "US10Y"];
-      const requests = symbols.map((symbol) =>
-        safeFetch(`https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${tdKey}`),
-      );
+      const requests = symbols.map((symbol) => safeFetch(`https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${tdKey}&ts=${Date.now()}`));
       const rows = await Promise.all(requests);
       rows.forEach((row, idx) => assets.push(mapAsset(symbols[idx].replace("/", ""), row)));
       sourceStatus.push({ source: "TwelveData", status: "ok", message: "关键资产实时接口可用" });
@@ -80,6 +111,9 @@ export default async function handler(_req: any, res: any) {
     sourceStatus.push({ source: "TwelveData", status: "fallback", message: "未配置 TWELVEDATA_API_KEY" });
   }
 
-  res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=120");
-  res.status(200).json({ feed, assets, sourceStatus });
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("x-cache-status", "bypass");
+  res.status(200).json({ feed, assets, sourceStatus, cacheStatus: "bypass" });
 }

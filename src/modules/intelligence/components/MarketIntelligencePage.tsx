@@ -15,7 +15,7 @@ export const MarketIntelligencePage = ({
 }: {
   renderHeader: (props: HeaderProps) => ReactNode;
 }) => {
-  const { data, loading, error, refresh } = useMarketIntelligence();
+  const { data, loading, error, refresh, refreshState } = useMarketIntelligence();
 
   return (
     <div className="space-y-7">
@@ -70,7 +70,7 @@ export const MarketIntelligencePage = ({
                 {(data?.feed || []).map((item) => (
                   <div key={item.id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-xs text-slate-200">{item.time}</span>
+                      <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-xs text-slate-200">{item.displayTime}</span>
                       <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-xs text-slate-300">{item.source}</span>
                       <span className="rounded-full border border-fuchsia-300/15 bg-fuchsia-400/8 px-2.5 py-1 text-xs text-fuchsia-200">{item.region}</span>
                       <span className="rounded-full border border-cyan-300/15 bg-cyan-400/8 px-2.5 py-1 text-xs text-cyan-200">{item.tag}</span>
@@ -163,6 +163,12 @@ export const MarketIntelligencePage = ({
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-sm text-slate-400">source status</div>
               <div className="mt-2 space-y-1 text-xs text-slate-300">
+                <div>feed source：{data?.feedSource || "--"}</div>
+                <div>refresh state：{refreshState}</div>
+                <div>last refresh：{data?.lastUpdated || "--"}</div>
+                <div>cache：{data?.cacheStatus || "unknown"}</div>
+                <div>fallback：{data?.isFallback ? "yes" : "no"}</div>
+                {error && <div>error：{error}</div>}
                 {(data?.sourceStatus || []).map((item) => (
                   <div key={item.source}>
                     {item.source}：{item.status}（{item.message}）

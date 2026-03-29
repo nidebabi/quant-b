@@ -30,17 +30,33 @@ const inferImpact = (title: string): string => {
   return "关注市场风险偏好变化";
 };
 
-export const mapReutersNews = (items: Array<{ title: string; pubDate?: string; source?: string }>): IntelFeedItem[] =>
-  items.slice(0, 8).map((item, index) => ({
-    id: `reuters-${index}`,
-    time: item.pubDate ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" }) : "--:--",
-    source: item.source || "Reuters",
-    region: inferRegion(item.title),
-    tag: inferTag(item.title),
-    level: inferLevel(item.title),
-    title: item.title,
-    impact: inferImpact(item.title),
-  }));
+export const mapReutersNews = (items: Array<{ title: string; pubDate?: string; source?: string }>): IntelFeedItem[] => {
+  const fetchedAt = new Date().toISOString();
+
+  return items
+    .slice()
+    .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime())
+    .slice(0, 8)
+    .map((item, index) => {
+      const publishedAt = item.pubDate ? new Date(item.pubDate).toISOString() : undefined;
+      const displayTime = publishedAt
+        ? new Date(publishedAt).toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" })
+        : new Date(fetchedAt).toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" });
+
+      return {
+        id: `reuters-${index}-${publishedAt || fetchedAt}`,
+        displayTime,
+        publishedAt,
+        fetchedAt,
+        source: item.source || "Reuters",
+        region: inferRegion(item.title),
+        tag: inferTag(item.title),
+        level: inferLevel(item.title),
+        title: item.title,
+        impact: inferImpact(item.title),
+      };
+    });
+};
 
 export const buildMappings = (feed: IntelFeedItem[]): IntelMapping[] =>
   feed.slice(0, 4).map((item) => ({
