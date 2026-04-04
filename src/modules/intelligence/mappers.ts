@@ -1,5 +1,6 @@
 import { ALERT_RULES, FALLBACK_ALERTS } from "./constants";
 import type { IntelAlert, IntelCluster, IntelFeedItem, IntelMapping, OverviewCard, SourceStatus } from "./types";
+import { formatPublishedTimeLabel } from "./utils/format";
 
 const inferLevel = (title: string): IntelFeedItem["level"] => {
   if (/(突发|急升|升级|冲突|降息|政策|制裁|暴涨)/.test(title)) return "高";
@@ -39,13 +40,19 @@ export const mapReutersNews = (items: Array<{ title: string; pubDate?: string; s
     id: `reuters-${item.pubDate || "no-pub"}-${index}`,
     publishedAt: item.pubDate,
     fetchedAt: new Date().toISOString(),
-    displayTime: item.pubDate ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" }),
+    displayTime: formatPublishedTimeLabel(item.pubDate, new Date().toISOString()),
     source: item.source || "Reuters",
     region: inferRegion(item.title),
     tag: inferTag(item.title),
     level: inferLevel(item.title),
     title: item.title,
     impact: inferImpact(item.title),
+  }));
+
+export const normalizeFeedDisplayTime = (feed: IntelFeedItem[]): IntelFeedItem[] =>
+  feed.map((item) => ({
+    ...item,
+    displayTime: formatPublishedTimeLabel(item.publishedAt, item.fetchedAt),
   }));
 
 export const buildMappings = (feed: IntelFeedItem[]): IntelMapping[] =>

@@ -1,5 +1,7 @@
 import { FALLBACK_ASSETS, FALLBACK_CLUSTERS, FALLBACK_FEED } from "../constants";
+import { normalizeFeedDisplayTime } from "../mappers";
 import type { IntelAsset, IntelFeedItem, SourceStatus } from "../types";
+import { formatPublishedTimeLabel } from "../utils/format";
 
 interface OverviewApiResponse {
   feed?: IntelFeedItem[];
@@ -9,7 +11,13 @@ interface OverviewApiResponse {
 }
 
 const safeFetchJson = async <T>(url: string): Promise<T> => {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
   }
@@ -21,31 +29,32 @@ export const fetchOverviewFromServerless = async (): Promise<OverviewApiResponse
 };
 
 export const fetchPublicNewsFallback = async (): Promise<IntelFeedItem[]> => {
-  const url = "https://api.rss2json.com/v1/api.json?rss_url=https://feeds.reuters.com/reuters/worldNews";
   try {
-    const json = await safeFetchJson<{ items?: Array<{ title: string; pubDate?: string }> }>(`${url}&t=${Date.now()}`);
-    const items = json.items || [];
-    if (!items.length) return FALLBACK_FEED;
+    const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(
+      "(stock OR market OR fed OR inflation OR oil OR gold) AND sourcelang:english",
+    )}&mode=artlist&maxrecords=30&format=json&sort=datedesc&t=${Date.now()}`;
+    const json = await safeFetchJson<{ articles?: Array<{ title?: string; seendate?: string }> }>(gdeltUrl);
+    const items = json.articles || [];
+    if (!items.length) return normalizeFeedDisplayTime(FALLBACK_FEED);
     return items
       .slice()
-      .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime())
+      .filter((item) => item.title)
+      .sort((a, b) => new Date(b.seendate || 0).getTime() - new Date(a.seendate || 0).getTime())
       .slice(0, 8)
       .map((item, index) => ({
-      id: `rss-${item.pubDate || "no-pub"}-${index}`,
-      publishedAt: item.pubDate,
+      id: `gdelt-fallback-${item.seendate || "no-pub"}-${index}`,
+      publishedAt: item.seendate,
       fetchedAt: new Date().toISOString(),
-      displayTime: item.pubDate
-        ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
-        : new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }),
-      source: "Reuters",
+      displayTime: formatPublishedTimeLabel(item.seendate, new Date().toISOString()),
+      source: "GDELT",
       region: "国际形势",
       tag: "宏观",
       level: index < 2 ? "高" : "中",
-      title: item.title,
+      title: item.title as string,
       impact: "关注市场风险偏好变化",
     }));
   } catch {
-    return FALLBACK_FEED;
+    return normalizeFeedDisplayTime(FALLBACK_FEED);
   }
 };
 
