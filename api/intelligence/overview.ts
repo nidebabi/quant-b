@@ -14,6 +14,8 @@ type FeedItem = {
 };
 
 type AssetItem = { asset: string; price: string; change: string; note: string };
+type GdeltArticle = { url?: string; title?: string; sourcecountry?: string; seendate?: string; socialimage?: string };
+type GdeltResponse = { articles?: GdeltArticle[] };
 
 const formatPublishedTimeLabel = (publishedAt?: string, fetchedAt?: string): string => {
   const picked = publishedAt || fetchedAt;
@@ -46,6 +48,17 @@ const safeFetch = async (url: string) => {
   return { json, cached };
 };
 
+const dedupeFeed = (items: FeedItem[]): FeedItem[] => {
+  const picked = new Map<string, FeedItem>();
+  items.forEach((item) => {
+    const key = `${item.title}::${item.publishedAt || ""}`;
+    if (!picked.has(key)) {
+      picked.set(key, item);
+    }
+  });
+  return Array.from(picked.values()).slice(0, 8);
+};
+
 const mapNews = (items: Array<{ title: string; pubDate?: string }>): FeedItem[] =>
   items
     .slice()
@@ -63,6 +76,23 @@ const mapNews = (items: Array<{ title: string; pubDate?: string }>): FeedItem[] 
     title: item.title,
     impact: /oil|crude/i.test(item.title) ? "关注油气 / 航运，留意成本端压力" : "关注市场风险偏好变化",
   }));
+
+const mapGdeltNews = (items: GdeltArticle[]): FeedItem[] =>
+  items
+    .filter((item) => item.title)
+    .map((item, index) => ({
+      id: `gdelt-${item.seendate || "no-time"}-${index}`,
+      publishedAt: item.seendate,
+      fetchedAt: new Date().toISOString(),
+      displayTime: formatPublishedTimeLabel(item.seendate, new Date().toISOString()),
+      source: "GDELT",
+      region: /United States|USA|US/i.test(item.sourcecountry || "") ? "海外宏观" : "国际形势",
+      tag: /oil|crude|opec/i.test(item.title || "") ? "原油" : /gold/i.test(item.title || "") ? "黄金" : "宏观",
+      level: (/surge|jump|war|sanction|rate|tariff|conflict/i.test(item.title || "") ? "高" : "中") as "高" | "中" | "低",
+      title: item.title as string,
+      impact: /oil|crude/i.test(item.title || "") ? "关注油气 / 航运，留意成本端压力" : "关注市场风险偏好变化",
+    }))
+    .sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
 
 const mapAsset = (symbol: string, value: any): AssetItem => {
   const price = Number(value.close ?? value.price ?? 0);
@@ -86,16 +116,43 @@ export default async function handler(_req: any, res: any) {
   let feedDataSource: "real" | "fallback" | "cached" = "fallback";
 
   try {
-    const newsResp = await safeFetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent("https://feeds.reuters.com/reuters/worldNews")}&t=${Date.now()}`);
-    if (Array.isArray(newsResp.json.items) && newsResp.json.items.length > 0) {
-      feed.push(...mapNews(newsResp.json.items));
-      feedDataSource = newsResp.cached ? "cached" : "real";
-      sourceStatus.push({ source: "Reuters News", status: "ok", message: newsResp.cached ? "rss2json 返回缓存结果" : "rss2json 代理可用" });
+    const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(
+      "(stock OR market OR fed OR inflation OR oil OR gold) AND sourcelang:english",
+    )}&mode=artlist&maxrecords=50&format=json&sort=datedesc`;
+    const gdeltResp = await safeFetch(`${gdeltUrl}&t=${Date.now()}`);
+    const gdeltItems = Array.isArray((gdeltResp.json as GdeltResponse).articles) ? (gdeltResp.json as GdeltResponse).articles || [] : [];
+    if (gdeltItems.length > 0) {
+      feed.push(...dedupeFeed(mapGdeltNews(gdeltItems)));
+      feedDataSource = gdeltResp.cached ? "cached" : "real";
+      sourceStatus.push({
+        source: "GDELT News",
+        status: "ok",
+        message: gdeltResp.cached ? `GDELT 返回缓存结果（${gdeltItems.length} 条）` : `GDELT 返回实时结果（${gdeltItems.length} 条）`,
+      });
     } else {
-      sourceStatus.push({ source: "Reuters News", status: "fallback", message: "rss2json 未返回可用快讯" });
+      sourceStatus.push({ source: "GDELT News", status: "fallback", message: "GDELT 未返回可用快讯" });
     }
   } catch (error) {
-    sourceStatus.push({ source: "Reuters News", status: "fallback", message: `不可用: ${String(error)}` });
+    sourceStatus.push({ source: "GDELT News", status: "fallback", message: `不可用: ${String(error)}` });
+  }
+
+  if (!feed.length) {
+    try {
+      const reutersResp = await safeFetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent("https://feeds.reuters.com/reuters/worldNews")}&t=${Date.now()}`);
+      if (Array.isArray(reutersResp.json.items) && reutersResp.json.items.length > 0) {
+        feed.push(...dedupeFeed(mapNews(reutersResp.json.items)));
+        feedDataSource = reutersResp.cached ? "cached" : "real";
+        sourceStatus.push({
+          source: "Reuters News",
+          status: "ok",
+          message: reutersResp.cached ? `Reuters 代理返回缓存结果（${reutersResp.json.items.length} 条）` : `Reuters 代理可用（${reutersResp.json.items.length} 条）`,
+        });
+      } else {
+        sourceStatus.push({ source: "Reuters News", status: "fallback", message: "Reuters 代理未返回可用快讯" });
+      }
+    } catch (error) {
+      sourceStatus.push({ source: "Reuters News", status: "fallback", message: `不可用: ${String(error)}` });
+    }
   }
 
   const tdKey = process.env.TWELVEDATA_API_KEY;

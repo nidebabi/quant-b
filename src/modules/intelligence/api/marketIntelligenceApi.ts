@@ -29,25 +29,28 @@ export const fetchOverviewFromServerless = async (): Promise<OverviewApiResponse
 };
 
 export const fetchPublicNewsFallback = async (): Promise<IntelFeedItem[]> => {
-  const url = "https://api.rss2json.com/v1/api.json?rss_url=https://feeds.reuters.com/reuters/worldNews";
   try {
-    const json = await safeFetchJson<{ items?: Array<{ title: string; pubDate?: string }> }>(`${url}&t=${Date.now()}`);
-    const items = json.items || [];
+    const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(
+      "(stock OR market OR fed OR inflation OR oil OR gold) AND sourcelang:english",
+    )}&mode=artlist&maxrecords=30&format=json&sort=datedesc&t=${Date.now()}`;
+    const json = await safeFetchJson<{ articles?: Array<{ title?: string; seendate?: string }> }>(gdeltUrl);
+    const items = json.articles || [];
     if (!items.length) return normalizeFeedDisplayTime(FALLBACK_FEED);
     return items
       .slice()
-      .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime())
+      .filter((item) => item.title)
+      .sort((a, b) => new Date(b.seendate || 0).getTime() - new Date(a.seendate || 0).getTime())
       .slice(0, 8)
       .map((item, index) => ({
-      id: `rss-${item.pubDate || "no-pub"}-${index}`,
-      publishedAt: item.pubDate,
+      id: `gdelt-fallback-${item.seendate || "no-pub"}-${index}`,
+      publishedAt: item.seendate,
       fetchedAt: new Date().toISOString(),
-      displayTime: formatPublishedTimeLabel(item.pubDate, new Date().toISOString()),
-      source: "Reuters",
+      displayTime: formatPublishedTimeLabel(item.seendate, new Date().toISOString()),
+      source: "GDELT",
       region: "国际形势",
       tag: "宏观",
       level: index < 2 ? "高" : "中",
-      title: item.title,
+      title: item.title as string,
       impact: "关注市场风险偏好变化",
     }));
   } catch {

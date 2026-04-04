@@ -14,7 +14,7 @@ export class IntelligenceRefreshError extends Error {
 }
 
 const fallbackSourceStatus: SourceStatus[] = [
-  { source: "Reuters News", status: "fallback", message: "使用前端回退快讯" },
+  { source: "GDELT News", status: "fallback", message: "使用前端回退快讯" },
   { source: "TwelveData", status: "fallback", message: "使用本地关键资产快照" },
 ];
 
@@ -30,8 +30,8 @@ const withFallbackSourceStatus = ({
   const bySource = new Map(sourceStatus.map((item) => [item.source, item]));
 
   if (usedFallbackFeed) {
-    bySource.set("Reuters News", {
-      source: "Reuters News",
+    bySource.set("GDELT News", {
+      source: "GDELT News",
       status: "fallback",
       message: "聚合接口未返回可用快讯，自动切换前端回退快讯",
     });
