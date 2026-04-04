@@ -1,4 +1,4 @@
-import { buildAlerts, buildClusters, buildMappings, buildOverviewCards, getFallbackAlerts } from "../mappers";
+import { buildAlerts, buildClusters, buildMappings, buildOverviewCards, getFallbackAlerts, normalizeFeedDisplayTime } from "../mappers";
 import { fetchOverviewFromServerless, fetchPublicNewsFallback, getFallbackAssets, getFallbackClusters } from "../api/marketIntelligenceApi";
 import type { FeedDataSource, IntelAsset, IntelFeedItem, MarketIntelligenceOverview, SourceStatus } from "../types";
 import { formatDateTime } from "../utils/format";
@@ -65,7 +65,7 @@ const resolveDataWithFallback = async (payload: {
 
   const feedDataSource: FeedDataSource = (payload.feed?.length ?? 0) === 0 ? "fallback" : payload.feedDataSource || "real";
 
-  return { feed, assets, sourceStatus, feedDataSource };
+  return { feed: normalizeFeedDisplayTime(feed), assets, sourceStatus, feedDataSource };
 };
 
 const buildOverview = ({
@@ -107,7 +107,7 @@ export const getMarketIntelligenceOverview = async (): Promise<MarketIntelligenc
     return buildOverview({ now, feed, assets, sourceStatus, feedDataSource });
   } catch (error) {
     console.warn("[intelligence] aggregated request failed, fallback mode", error);
-    const feed = await fetchPublicNewsFallback();
+    const feed = normalizeFeedDisplayTime(await fetchPublicNewsFallback());
     const clusters = buildClusters(feed);
     const alerts = getFallbackAlerts();
     const fallbackData = {

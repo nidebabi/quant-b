@@ -17,6 +17,7 @@ export const MarketIntelligencePage = ({
 }) => {
   const { data, loading, error, refresh } = useMarketIntelligence();
   const isFallbackFeed = data?.feedDataSource === "fallback";
+  const isCachedFeed = data?.feedDataSource === "cached";
   const feedSourceLabel = data?.feedDataSource || "--";
 
   return (
@@ -53,6 +54,7 @@ export const MarketIntelligencePage = ({
 
           {error && <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">{error}</div>}
           {isFallbackFeed && <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">当前为 fallback 数据</div>}
+          {isCachedFeed && <div className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-3 py-2 text-sm text-cyan-200">当前为 cached 数据</div>}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">

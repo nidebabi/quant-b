@@ -1,5 +1,7 @@
 import { FALLBACK_ASSETS, FALLBACK_CLUSTERS, FALLBACK_FEED } from "../constants";
+import { normalizeFeedDisplayTime } from "../mappers";
 import type { IntelAsset, IntelFeedItem, SourceStatus } from "../types";
+import { formatPublishedTimeLabel } from "../utils/format";
 
 interface OverviewApiResponse {
   feed?: IntelFeedItem[];
@@ -9,7 +11,13 @@ interface OverviewApiResponse {
 }
 
 const safeFetchJson = async <T>(url: string): Promise<T> => {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
   }
@@ -25,7 +33,7 @@ export const fetchPublicNewsFallback = async (): Promise<IntelFeedItem[]> => {
   try {
     const json = await safeFetchJson<{ items?: Array<{ title: string; pubDate?: string }> }>(`${url}&t=${Date.now()}`);
     const items = json.items || [];
-    if (!items.length) return FALLBACK_FEED;
+    if (!items.length) return normalizeFeedDisplayTime(FALLBACK_FEED);
     return items
       .slice()
       .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime())
@@ -34,9 +42,7 @@ export const fetchPublicNewsFallback = async (): Promise<IntelFeedItem[]> => {
       id: `rss-${item.pubDate || "no-pub"}-${index}`,
       publishedAt: item.pubDate,
       fetchedAt: new Date().toISOString(),
-      displayTime: item.pubDate
-        ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
-        : new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }),
+      displayTime: formatPublishedTimeLabel(item.pubDate, new Date().toISOString()),
       source: "Reuters",
       region: "国际形势",
       tag: "宏观",
@@ -45,7 +51,7 @@ export const fetchPublicNewsFallback = async (): Promise<IntelFeedItem[]> => {
       impact: "关注市场风险偏好变化",
     }));
   } catch {
-    return FALLBACK_FEED;
+    return normalizeFeedDisplayTime(FALLBACK_FEED);
   }
 };
 

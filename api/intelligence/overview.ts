@@ -15,8 +15,29 @@ type FeedItem = {
 
 type AssetItem = { asset: string; price: string; change: string; note: string };
 
+const formatPublishedTimeLabel = (publishedAt?: string, fetchedAt?: string): string => {
+  const picked = publishedAt || fetchedAt;
+  if (!picked) return "发布时间：未知";
+
+  const date = new Date(picked);
+  if (Number.isNaN(date.getTime())) return "发布时间：未知";
+
+  const year = date.toLocaleString("zh-CN", { year: "numeric", timeZone: "Asia/Shanghai" });
+  const month = date.toLocaleString("zh-CN", { month: "2-digit", timeZone: "Asia/Shanghai" });
+  const day = date.toLocaleString("zh-CN", { day: "2-digit", timeZone: "Asia/Shanghai" });
+  const hour = date.toLocaleString("zh-CN", { hour: "2-digit", hour12: false, timeZone: "Asia/Shanghai" });
+  const minute = date.toLocaleString("zh-CN", { minute: "2-digit", timeZone: "Asia/Shanghai" });
+  return `发布时间：${year}年${month}月${day}日 ${hour}点${minute}分`;
+};
+
 const safeFetch = async (url: string) => {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const json = await response.json();
   const age = response.headers.get("age");
@@ -34,9 +55,7 @@ const mapNews = (items: Array<{ title: string; pubDate?: string }>): FeedItem[] 
     id: `news-${item.pubDate || "no-pub"}-${index}`,
     publishedAt: item.pubDate,
     fetchedAt: new Date().toISOString(),
-    displayTime: item.pubDate
-      ? new Date(item.pubDate).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Shanghai" })
-      : new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Shanghai" }),
+    displayTime: formatPublishedTimeLabel(item.pubDate, new Date().toISOString()),
     source: "Reuters",
     region: /Fed|U\.S|Treasury|inflation/i.test(item.title) ? "海外宏观" : "国际形势",
     tag: /oil|crude|OPEC/i.test(item.title) ? "原油" : /gold/i.test(item.title) ? "黄金" : "宏观",
@@ -94,6 +113,8 @@ export default async function handler(_req: any, res: any) {
     sourceStatus.push({ source: "TwelveData", status: "fallback", message: "未配置 TWELVEDATA_API_KEY" });
   }
 
-  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   res.status(200).json({ feed, assets, sourceStatus, feedDataSource });
 }
